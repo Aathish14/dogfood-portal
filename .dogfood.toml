@@ -1,0 +1,18 @@
+[portal]
+base_url = "http://localhost:8080"
+
+[tiers]
+claimed = ["T1", "T2"]
+
+[auth]
+organizer = "Cookie: session=organizer_session"
+judge_a = "Cookie: session=judge_a_session"
+judge_b = "Cookie: session=judge_b_session"
+participant = "Cookie: session=participant_session"
+
+[routes]
+gallery = "/projects"
+submit = "/projects/new"
+judge_scores = "/api/judge/scores"
+peer_scores = "/api/judge/scores?judge=judge_a"
+csv_export = "/api/export.csv"

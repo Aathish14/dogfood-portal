@@ -1,0 +1,338 @@
+% -----------------------------------------------------------------------------
+\section{Role-centered functional specification}
+
+\advisory\par
+
+
+The kickoff deck names capabilities, but an adoptable portal must connect them into coherent experiences for each actor. The workflows below make those expectations concrete without changing the official tier definitions.
+
+\subsection{Organizer workflow}
+
+\begin{longtable}{@{}L{31mm}L{42mm}L{84mm}@{}}
+\toprule
+\textbf{Phase} & \textbf{Organizer action} & \textbf{Observable outcome}\\
+\midrule
+\endhead%
+Installation & Start the Compose stack on a disconnected laptop & Application, database, migrations, fixtures, and local assets become available without contacting an external service\\
+Event setup & Create or inspect an event; define windows, tracks, eligibility, rubric, and visibility & The event has explicit server-side timestamps and a valid weighted rubric\\
+Access setup & Create users or load fixtures; assign participant, judge, and organizer roles & The four checker identities are usable, and their auth headers are printed or otherwise easy to obtain\\
+Submission period & Monitor registration, teams, and project completeness & Participants can submit only for their own teams and only inside the allowed window\\
+Eligibility review & Flag duplicates or ineligible projects and record a reason & Only eligible projects proceed, while the original record and decision remain auditable\\
+Judge setup & Invite judges, capture expertise/conflicts, and produce assignments & Every eligible project receives the intended coverage without assigning declared conflicts\\
+Judging & Monitor completed, in-progress, and unstarted reviews & Incomplete batches are visible early enough for reassignment\\
+Results calculation & Freeze inputs, run normalization, inspect raw versus adjusted results & The ranking is reproducible from a versioned method and immutable input snapshot\\
+Publication & Release results only after the configured window & No public or participant endpoint leaks rankings before release\\
+Closure & Export data, archive the event, and preserve documentation & The event can be audited, restored, or migrated without the original developer\\
+\bottomrule
+\end{longtable}
+
+\subsection{Participant workflow}
+
+A participant should be able to register, join or form a team, prepare a project, understand the deadline, submit, confirm the accepted state, and see the public gallery without receiving judge-only data. Submission ownership must follow authenticated team membership rather than a user-supplied team identifier.
+
+Useful participant-facing states include \emph{draft}, \emph{submitted}, \emph{late/refused}, \emph{eligible}, \emph{ineligible}, and \emph{withdrawn}. If editing is allowed after an initial submission, the portal should state whether the deadline freezes the latest version, the first submitted version, or a separately confirmed final version.
+
+\subsection{Judge workflow}
+
+A judge should see only assigned projects and personal review records. A complete workflow is:
+
+\begin{enumerate}
+  \item authenticate as a judge;
+  \item view assignment progress and conflict information;
+  \item open an assigned project;
+  \item score every required rubric criterion and add comments where required;
+  \item save a draft without accidentally publishing a partial review;
+  \item submit or finalize the review;
+  \item see the judge's own completed scores; and
+  \item remain unable to retrieve another judge's scores through either UI or API\@.
+\end{enumerate}
+
+The UI may hide peer scores, but the decisive rule is enforced by server-side ownership checks on every read and write.
+
+\subsection{Public visitor workflow}
+
+An unauthenticated visitor must be able to open the gallery and see the shared fixture projects. At Tier 3, the visitor may also vote or comment subject to the platform's identity and abuse policy. Results and vote totals should remain unavailable until the relevant release window closes.
+
+\begin{keybox}
+\textbf{Recommended invariant:} every protected action should be expressible as ``authenticated actor + event-scoped role + resource ownership + current event state''. Frontend visibility is presentation; this server-side decision is authorization.
+\end{keybox}
+
+% -----------------------------------------------------------------------------
+\section{Judging integrity playbook and worked example}
+
+\advisory\par
+
+
+\subsection{Rubric definition and freezing}
+
+Each criterion should have a stable identifier, label, description, numeric scale, weight, and ordering. Validate that weights are non-negative and that their total is meaningful. The portal should refuse to calculate a result from an empty rubric.
+
+Once judging begins, editing a criterion or weight can retroactively change every score. A robust policy is to freeze the rubric or create a new rubric version, record who made the change, and recalculate through an explicit result run. Silent mutation damages reproducibility.
+
+\subsection{Review lifecycle}
+
+Suggested review states are \emph{unstarted}, \emph{draft}, \emph{submitted}, \emph{reopened}, and \emph{voided}. A submitted review should record its author and submission timestamp. Reopening or voiding it should require a reason and generate an audit event.
+
+Missing criteria must have a defined treatment. Treating missing values as zero can unfairly penalize a project; silently averaging only completed criteria can reward incomplete judging. The product should either require completion or display an explicit provisional state.
+
+\subsection{Worked normalization example}
+
+Suppose two judges score three projects on the same aggregate scale. Judge 1 uses a relatively narrow, descending scale; Judge 2 uses a higher and wider scale.
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Project} & \textbf{Judge 1 raw} & \textbf{Judge 2 raw} & \textbf{Raw average} & \textbf{Raw rank}\\
+\midrule
+Alpha & 90 & 70 & 80.0 & 3\\
+Beta  & 80 & 95 & 87.5 & 1\\
+Gamma & 70 & 100 & 85.0 & 2\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Using population standardization within each judge gives approximately:
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Project} & \textbf{Judge 1 $z$} & \textbf{Judge 2 $z$} & \textbf{Mean $z$} & \textbf{Normalized rank}\\
+\midrule
+Alpha & 1.225 & -1.397 & -0.086 & 2\\
+Beta  & 0.000 &  0.508 &  0.254 & 1\\
+Gamma & -1.225 & 0.889 & -0.168 & 3\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The example changes the order of Alpha and Gamma. That does not prove standardization is universally correct; it demonstrates why the method must be visible and defended. A third judge who gives all three projects 75 has zero variance. The system must apply its documented zero-variance policy and report that treatment in the result run.
+
+\subsection{Result-run provenance}
+
+A reproducible normalization run should retain:
+
+\begin{itemize}
+  \item the event and rubric version;
+  \item the set of included projects, assignments, and submitted reviews;
+  \item the algorithm name and version;
+  \item parameters, missing-data rules, and zero-variance rules;
+  \item the actor who initiated the run and its timestamp;
+  \item raw aggregates, normalized values, tie handling, and final ordering; and
+  \item warnings such as incomplete batches or excluded records.
+\end{itemize}
+
+\subsection{Ties and incomplete judging}
+
+Define ties before results are calculated. Possible policies include shared rank, deterministic secondary criteria, additional judging, or an explicitly documented tie-break bonus. Do not use an opaque database ordering as an accidental tie-break.
+
+If judging is incomplete, the portal should either prevent final publication or label the result provisional. The two intentionally unfinished fixture batches make this behavior visible to evaluators.
+
+% -----------------------------------------------------------------------------
+\section{Security and threat model}
+
+\advisory\par
+
+
+\begin{longtable}{@{}L{31mm}L{38mm}L{43mm}L{46mm}@{}}
+\toprule
+\textbf{Asset} & \textbf{Threat} & \textbf{Primary control} & \textbf{Evidence to demonstrate}\\
+\midrule
+\endhead%
+Judge scores & One judge reads a peer's scores & Server-side event role and record-ownership checks & Request as \texttt{judge\_b} for \texttt{judge\_a}; receive 401 or 403\\
+Judge scores & Participant accesses judging routes & Deny participant role before querying data & Checker participant-blocked result plus manual API request\\
+Submission window & Client clock or crafted request bypasses deadline & Compare authoritative server time with stored event timestamp & Post after \texttt{submissions\_close}; observe refusal and unchanged database\\
+Project ownership & Participant edits another team's project & Team membership and resource ownership validation & Change project identifier while authenticated as another team\\
+Results & Early ranking disclosure & Release-state checks on every result endpoint and export & Request results before release through UI, API, CSV, and embed routes\\
+Community vote & Ballot stuffing or scripted voting & Identity policy, rate controls, deduplication signals, and audit events & Repeated vote attempts produce a visible, reviewable outcome\\
+Administrative actions & Silent score or rubric changes & Append-only audit log and reasoned overrides & Show actor, old/new state, timestamp, and reason\\
+Sessions & Guessable or leaked credentials & Random secrets, scoped cookies/tokens, and no fixture credentials in production & Explain generation, storage, expiration, and fixture-only boundaries\\
+Webhook delivery & Forged callback or replay & Signature, timestamp, replay window, and event identifier & Verify invalid signature fails and repeated delivery is idempotent\\
+CSV export & Spreadsheet formula injection & Escape or neutralize cells beginning with formula characters & Export hostile fixture text and inspect the resulting CSV\\
+\bottomrule
+\end{longtable}
+
+\subsection{Audit-event minimum fields}
+
+An audit event should include a stable event identifier, timestamp, authenticated actor, actor role, action, target type and ID, outcome, and relevant metadata. For sensitive changes, record a reason and an old/new summary. Avoid logging passwords, session tokens, or unnecessary personal data.
+
+Audit records are useful only if ordinary users cannot rewrite them. If full immutability is impractical in 72 hours, document who can delete them and what residual risk remains.
+
+\subsection{Failure behavior}
+
+Authorization failures should return consistent 401/403 responses without revealing whether a protected record exists. Validation failures should identify correctable input problems. Unexpected failures should not expose stack traces, secrets, database queries, or other users' data.
+
+% -----------------------------------------------------------------------------
+\section{API, webhook, and data-exchange blueprint}
+
+\advisory\par
+
+
+The deck allows arbitrary routes; the table below is a suggested resource-oriented surface, not a checker contract.
+
+\begin{longtable}{@{}L{54mm}L{31mm}L{73mm}@{}}
+\toprule
+\textbf{Example route} & \textbf{Primary role} & \textbf{Purpose}\\
+\midrule
+\endhead%
+\texttt{GET /projects} & Public & Public gallery and fixture visibility\\
+\texttt{POST /events/:id/projects} & Participant & Create a team-owned project inside the submission window\\
+\texttt{POST /events/:id/submit} & Participant & Finalize or submit the project, subject to deadline and eligibility\\
+\texttt{GET /judge/assignments} & Judge & List only the authenticated judge's assignments\\
+\texttt{GET /judge/scores} & Judge & Retrieve only the authenticated judge's score records\\
+\texttt{PUT /judge/reviews/:id} & Judge & Save or submit an authorized review\\
+\texttt{GET /organizer/progress} & Organizer & Inspect assignment and completion progress\\
+\texttt{POST /organizer/normalizations} & Organizer & Execute a versioned normalization run\\
+\texttt{POST /organizer/results/publish} & Organizer & Publish results after release requirements are met\\
+\texttt{GET /api/export.csv} & Organizer/checker & Produce the required CSV export\\
+\bottomrule
+\end{longtable}
+
+\subsection{API properties}
+
+If pursuing Tier 4 or API First, document:
+
+\begin{itemize}
+  \item authentication format and event-scoped authorization;
+  \item request/response schemas and error structure;
+  \item pagination, filtering, and stable ordering;
+  \item idempotency for retried writes and bulk imports;
+  \item API versioning and deprecation policy;
+  \item rate limits where appropriate; and
+  \item an OpenAPI document covering every UI action.
+\end{itemize}
+
+\subsection{Suggested webhook events}
+
+Useful events include:
+
+\begin{itemize}
+  \item \texttt{project.submitted};
+  \item \texttt{project.eligibility\_changed};
+  \item \texttt{assignment.created};
+  \item \texttt{review.submitted};
+  \item \texttt{judging.completed}; and
+  \item \texttt{results.published}.
+\end{itemize}
+
+Each delivery should have a unique ID, event type, creation timestamp, versioned payload, and signature. Retrying the same delivery must not duplicate downstream actions.
+
+\subsection{CSV contract}
+
+The checker route should respond with a CSV media type and syntactically valid rows. For human and machine use, prefer UTF-8, a stable header row, stable identifiers, consistent timestamp format, explicit blank/missing semantics, and deterministic ordering. Document whether the file contains one row per project, assignment, review, or criterion score.
+
+For reproducibility, an organizer export may be split into several files: projects, teams, users/roles, assignments, criterion scores, normalized results, and audit events. The acceptance checker requires only that its configured CSV export work; richer export is an adoptability feature.
+
+% -----------------------------------------------------------------------------
+\section{Offline operations and recovery runbook}
+
+\advisory\par
+
+
+\subsection{Fresh-machine verification}
+
+Before submission, test the exact evaluator path:
+
+\begin{enumerate}
+  \item use a clean checkout without local developer state;
+  \item disconnect networking or block outbound access;
+  \item run \texttt{docker compose up};
+  \item wait only for documented health checks, migrations, and seed completion;
+  \item capture the printed organizer, two judge, and participant headers;
+  \item fill in \texttt{.dogfood.toml};
+  \item run the checker; and
+  \item stop and restart the stack to confirm persistence and idempotent startup.
+\end{enumerate}
+
+Images, packages, fonts, JavaScript bundles, database extensions, and migrations must already be present locally. A page that loads but waits on a remote CDN does not meet the spirit of network-off operation.
+
+\subsection{Backups and restoration}
+
+An operator should know which volume or files contain database state and uploaded assets. Document a backup command, a restoration command, and whether backups are consistent while the application is running. Test one restoration rather than documenting an unverified procedure.
+
+\subsection{Time and timezone}
+
+Store authoritative instants in UTC and render them with an explicit timezone. Deadline comparisons should occur on the server. The UI should show the event timezone or UTC clearly so participants do not infer a local time incorrectly.
+
+\subsection{Operational visibility}
+
+A minimal health endpoint should distinguish application availability from database readiness. Logs should identify migration, seed, authentication, assignment, export, and normalization failures without exposing secrets. Organizer dashboards should surface actionable states such as incomplete batches and failed webhook deliveries.
+
+\subsection{Safe restart behavior}
+
+Repeated startup should not duplicate the 40 projects, 30 judges, 8 tracks, scores, or fixture users. Seed operations should use stable identifiers or an explicit reset mode. Destructive reset behavior must be opt-in and clearly labeled.
+
+% -----------------------------------------------------------------------------
+\section{Verification strategy and five-minute demo storyboard}
+
+\advisory\par
+
+
+\subsection{Minimum high-value tests}
+
+\begin{longtable}{@{}L{37mm}L{52mm}L{69mm}@{}}
+\toprule
+\textbf{Test family} & \textbf{Example} & \textbf{Risk covered}\\
+\midrule
+\endhead%
+Startup & Fresh offline Compose boot with empty volumes & Adoption failure and hidden cloud dependency\\
+Seed & Run seed twice and count fixture records & Duplicate data and non-repeatable evaluation\\
+Deadline & Submit one second before and at/after close & Boundary errors and client-clock bypass\\
+Authorization & Cross every role with every protected route & Peer-score and participant leakage\\
+Ownership & Change team/project/judge identifiers in requests & Insecure direct object reference\\
+Rubric & Invalid weights, boundary scores, missing criteria & Incorrect aggregates and weak validation\\
+Normalization & Constant judge, missing reviews, ranking change & Divide-by-zero and unexplained results\\
+Export & Parse CSV containing commas, quotes, newlines, and formula-like text & Broken interchange and spreadsheet injection\\
+Publication & Request results through all surfaces before release & Premature disclosure\\
+Recovery & Restart and restore a backup & Data loss and unrecoverable operation\\
+\bottomrule
+\end{longtable}
+
+\subsection{Five-minute demo storyboard}
+
+\begin{tabularx}{\linewidth}{@{}L{22mm}L{49mm}Y@{}}
+\toprule
+\textbf{Time} & \textbf{Action} & \textbf{Evidence delivered}\\
+\midrule
+0:00--0:30 & Start with the product claim and architecture & One product, offline, intended tier, and honest limitations\\
+0:30--1:00 & Show startup and fixture gallery & Compose operation, public access, and seeded projects\\
+1:00--1:35 & Demonstrate team submission and deadline refusal & Working participant flow and server-side event state\\
+1:35--2:15 & Show organizer assignment and progress & Multiple judges, batches, and incomplete-review visibility\\
+2:15--3:00 & Enter weighted judge scores & Rubric behavior and personal review access\\
+3:00--3:30 & Attempt peer-score and participant access & Visible 401/403 role isolation at the backend\\
+3:30--4:10 & Run normalization and compare raw/results & Defended method, fixture edge case, and ranking provenance\\
+4:10--4:35 & Export CSV and show result controls & Portability and controlled publication\\
+4:35--5:00 & Show checker output and documentation & Evidence, honest gaps, and immediate adoptability\\
+\bottomrule
+\end{tabularx}
+
+The demo should not spend most of its time on slides. The application, network panel or HTTP client, checker output, and relevant documents provide stronger evidence.
+
+% -----------------------------------------------------------------------------
+\section{Documentation blueprint and decision record}
+
+\advisory\par
+
+
+\subsection{README structure}
+
+Include the product's purpose, claimed tiers, screenshots or a concise feature list, prerequisites, exact offline startup steps, fixture credentials/headers, checker invocation, known limitations, license, and links to the deeper technical documents.
+
+\subsection{Architecture document}
+
+Explain components, trust boundaries, runtime containers, request flow, authorization placement, persistence, seed behavior, result calculation, exports, and major tradeoffs. A diagram should agree with the Compose file and deployed code.
+
+\subsection{Data-model document}
+
+Describe entities, keys, relationships, lifecycle states, timestamp/timezone policy, migrations, deletion policy, fixture import, CSV/bulk export, and how duplicate submissions and incomplete reviews are represented.
+
+\subsection{Judging document}
+
+State assignment objectives, conflict handling, rubric and weighting mathematics, missing-score policy, normalization formula, zero-variance treatment, tie policy, incomplete-judging policy, publication conditions, and a worked raw-to-final example.
+
+\subsection{Architecture decision record}
+
+For each consequential choice, record the context, chosen option, alternatives considered, consequences, and whether the decision is reversible. High-value decisions include the authentication model, database, deadline semantics, duplicate policy, assignment algorithm, normalization method, audit design, and API versioning.
+
+\begin{advicebox}
+Documentation is strongest when it describes the software that actually exists. Update the documents after the final implementation decisions, and preserve known weaknesses rather than replacing them with aspirational language.
+\end{advicebox}

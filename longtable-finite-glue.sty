@@ -1,0 +1,18 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{longtable-finite-glue}[2026/09/27 Finite page glue for longtable]
+
+\RequirePackage{etoolbox}
+
+% longtable v4.23 uses \vss in its output routine, which triggers an
+% "Infinite glue shrinkage" diagnostic in TeX Live 2025.  This applies the
+% finite-glue replacement adopted upstream in longtable v4.25.
+\makeatletter
+\patchcmd{\LT@output}
+  {\copy\LT@foot\vss}
+  {\copy\LT@foot\vskip\z@\@plus1fil\@minus\normalbaselineskip}{}{}
+\patchcmd{\LT@output}
+  {\copy\LT@foot\vss}
+  {\copy\LT@foot\vskip\z@\@plus1fil\@minus\normalbaselineskip}{}{}
+\makeatother
+
+\endinput

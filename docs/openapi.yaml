@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: DOGFOOD Portal API
+  version: 0.0.0-tbd
+  summary: Documentation skeleton; no implemented API contract is present.
+  description: >-
+    The supplied repository defines checker route keys and proposed advisory
+    endpoints, but it does not contain an application implementation, run.py,
+    request/response schemas, or a finalized REST contract. Paths are therefore
+    intentionally empty. Populate this file only after implementation decisions
+    are made and verified against the checker.
+servers: []
+tags:
+  - name: Gallery
+    description: Public project gallery; exact API contract TBD.
+  - name: Submissions
+    description: Team/project submission; exact API contract TBD.
+  - name: Judging
+    description: Assignments, reviews, and judge-owned scores; exact API contract TBD.
+  - name: Results
+    description: Normalization, ranking, and release; exact API contract TBD.
+  - name: Export
+    description: CSV and future bulk export; exact API contract TBD.
+  - name: Integrations
+    description: Tier 4 REST/webhook interfaces; planned only.
+paths: {}
+components: {}
+x-documentation-status:
+  implementation-present: false
+  checker-present: false
+  fixture-present: false
+  contract-status: TBD
+x-dogfood-checker-route-keys:
+  gallery:
+    sample-path: /projects
+    exact-method: TBD
+    acceptance-checks:
+      - AC-T1-001
+      - AC-T1-002
+  submit:
+    sample-path: /projects/new
+    exact-method: TBD
+    acceptance-checks:
+      - AC-T1-003
+  judge_scores:
+    sample-path: /api/judge/scores
+    exact-method: TBD
+    acceptance-checks:
+      - AC-T2-001
+      - AC-T2-003
+  peer_scores:
+    sample-path: /api/judge/scores?judge=judge_a
+    exact-method: TBD
+    required-denial-status:
+      - 401
+      - 403
+    acceptance-checks:
+      - AC-T2-002
+  csv_export:
+    sample-path: /api/export.csv
+    exact-method: TBD
+    acceptance-checks:
+      - AC-T2-004
+x-required-auth-identities:
+  - organizer
+  - judge_a
+  - judge_b
+  - participant
+x-next-actions:
+  - Inspect run.py and encode exact checker methods, payloads, and responses.
+  - Inspect the application implementation and add only real paths and schemas.
+  - Define authentication and authorization schemes.
+  - Define reusable error, pagination, project, review, score, result, and export schemas.
+  - Validate the completed document with an OpenAPI 3.1 validator.
