@@ -87,7 +87,9 @@ graph LR
     style H fill:#87ceeb
     style I fill:#ffd700
     style J fill:#ff6b6b,color:#fff
-🏗️ Architecture
+
+
+## 🏗️ Architecture
 High-Level Component Architecture
 mermaid
 
@@ -208,7 +210,8 @@ sequenceDiagram
     CSV-->>P: CSV rows
     P-->>O: 200 OK + text/csv
     Note over O,P: Formula-injection protected
-🚀 Quick Start
+
+## 🚀 Quick Start
 Option A: Docker (Recommended for Judges)
 Shell
 
@@ -233,7 +236,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 python run.py .dogfood.toml
 The portal will be available at http://localhost:8080.
 
-📡 API Reference
+## 📡 API Reference
 MethodEndpointAuth RequiredDescription
 GET/NoneAPI root info
 GET/healthNoneLiveness probe
@@ -267,7 +270,8 @@ graph TD
     style ORG fill:#90ee90
     style ALLOW1 fill:#90ee90
     style ALLOW2 fill:#90ee90
-✅ Acceptance Verification
+
+## ✅ Acceptance Verification
 The portal is verified by the official DOGFOOD 2026 acceptance suite (run.py).
 
 text
@@ -286,7 +290,8 @@ T2  participant blocked ............... PASS
 T2  csv export works .................. PASS
 
 claimed T1 T2, verified T1 T2
-📁 Repository Structure
+
+## 📁 Repository Structure
 text
 
 dogfood/
@@ -307,7 +312,8 @@ dogfood/
 ├── requirements.txt             # Python dependencies
 ├── LICENSE                      # MIT License
 └── README.md                    # This file
-🛠️ Tech Stack
+
+## 🛠️ Tech Stack
 LayerChoiceReason
 LanguagePython 3.11Zero-install stdlib for checker
 FrameworkFastAPIAsync, OpenAPI native, type-safe
@@ -316,5 +322,6 @@ Persistencefixtures.json + SQLAlchemyDeterministic offline seed
 AuthSession cookiesSimple, aligns with checker contract
 ContainerDocker ComposeSingle-command offline startup
 LicenseMITOSI-approved, permissive
-📜 License
+
+## 📜 License
 This project is licensed under the MIT License — see the LICENSE file for details.
